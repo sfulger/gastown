@@ -890,7 +890,7 @@ Then use await-event to subscribe to the refinery event channel with exponential
 
 ```bash
 gt mol step await-event --channel refinery --agent-bead YOUR_AGENT_BEAD \
-  --backoff-base 30s --backoff-mult 2 --backoff-max 5m --cleanup
+  --backoff-base 30s --backoff-mult 2 --backoff-max 15m --cleanup
 ```
 
 This command:
@@ -900,7 +900,7 @@ This command:
    - First timeout: 30s
    - Second timeout: 60s
    - Third timeout: 120s
-   - ...capped at 5 minutes max
+   - ...capped at 15 minutes max
 4. Tracks `idle:N` label on refinery agent bead for backoff state
 5. `--cleanup` auto-deletes processed event files
 

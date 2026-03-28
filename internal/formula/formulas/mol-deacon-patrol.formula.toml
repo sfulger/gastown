@@ -49,7 +49,7 @@ description = """
 Signal liveness to the daemon.
 
 The daemon monitors `deacon/heartbeat.json` and kills the Deacon if it goes stale
-(>15 minutes without update). Refresh the heartbeat at the start of every patrol cycle
+(>20 minutes without update). Refresh the heartbeat at the start of every patrol cycle
 so the daemon knows we are alive.
 
 ```bash
@@ -1140,7 +1140,7 @@ Use await-signal with exponential backoff to wait for activity:
 
 ```bash
 gt mol step await-signal --agent-bead hq-deacon \
-  --backoff-base 60s --backoff-mult 2 --backoff-max 5m
+  --backoff-base 60s --backoff-mult 2 --backoff-max 15m
 ```
 
 This command:
@@ -1150,7 +1150,7 @@ This command:
    - First timeout: 60s
    - Second timeout: 120s
    - Third timeout: 240s
-   - ...capped at 5 minutes max (PATCH-002: reduced from 10m for faster recovery)
+   - ...capped at 15 minutes max
 4. Tracks `idle:N` label on hq-deacon bead for backoff state
 
 **On signal received** (activity detected):

@@ -1380,18 +1380,18 @@ func (d *Daemon) checkDeaconHeartbeat() {
 	}
 
 	// Session exists but heartbeat is stale - Deacon may be stuck.
-	// gt-p7k: Use two-tier response — nudge for stale (5-15 min),
-	// escalate only for very stale (>= 15 min). The previous logic gated on
+	// gt-p7k: Use two-tier response — nudge for stale (5-20 min),
+	// escalate only for very stale (>= 20 min). The previous logic gated on
 	// IsVeryStale() (>= 15 min) then checked age > 10 min, making the
-	// nudge path unreachable (dead code). Now nudge fires for 5-15 min
+	// nudge path unreachable (dead code). Now nudge fires for 5-20 min
 	// staleness, giving the Deacon a chance to respond before killing.
-	// Kill threshold must be > backoff-max (5m) to avoid false positive
+	// Kill threshold must be > backoff-max (15m) to avoid false positive
 	// kills during legitimate await-signal sleep.
 	if hb.IsVeryStale() {
 		// Detection only: stuck-agent-dog plugin handles context-aware restart
 		d.logger.Printf("STUCK DEACON: heartbeat stale for %s, session %s needs restart", age.Round(time.Minute), sessionName)
 	} else {
-		// Stale but not very stale (5-15 min) - nudge to wake up
+		// Stale but not very stale (5-20 min) - nudge to wake up
 		d.logger.Printf("Deacon stuck for %s - nudging session", age.Round(time.Minute))
 		if err := d.tmux.NudgeSession(sessionName, "HEALTH_CHECK: heartbeat stale, respond to confirm responsiveness"); err != nil {
 			d.logger.Printf("Error nudging stuck Deacon: %v", err)

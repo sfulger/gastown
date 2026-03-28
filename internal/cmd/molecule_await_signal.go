@@ -64,7 +64,7 @@ EXAMPLES:
 
   # Backoff mode with agent bead tracking:
   gt mol await-signal --agent-bead gt-gastown-witness \
-    --backoff-base 30s --backoff-mult 2 --backoff-max 5m
+    --backoff-base 30s --backoff-mult 2 --backoff-max 15m
 
   # On timeout, the agent bead's idle:N label is auto-incremented
   # On signal, caller should reset: gt agent state gt-gastown-witness --set idle=0
