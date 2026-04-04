@@ -329,41 +329,77 @@ var reaperAutoCloseCmd = &cobra.Command{
 	Long: `Close issues open with no updates past the stale-age threshold.
 Excludes P0/P1 priority, epics, and issues with active dependencies.
 
+When --db is provided, auto-closes in a single database. When omitted,
+auto-discovers all databases on the Dolt server and auto-closes in each one.
+
 Returns the count of closed issues. Use --dry-run to preview.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if reaperDB == "" {
-			return fmt.Errorf("--db is required")
-		}
-
 		staleAge, err := time.ParseDuration(reaperStaleAge)
 		if err != nil {
 			return fmt.Errorf("invalid --stale-age: %w", err)
 		}
 
-		db, err := reaper.OpenDB(reaperHost, reaperPort, reaperDB, 10*time.Second, 10*time.Second)
-		if err != nil {
-			return fmt.Errorf("connect to %s: %w", reaperDB, err)
+		databases := reaper.DiscoverDatabases(reaperHost, reaperPort)
+		if reaperDB != "" {
+			databases = strings.Split(reaperDB, ",")
 		}
-		defer db.Close()
 
-		result, err := reaper.AutoClose(db, reaperDB, staleAge, reaperDryRun)
-		if err != nil {
-			return fmt.Errorf("auto-close %s: %w", reaperDB, err)
+		var results []*reaper.AutoCloseResult
+		for _, dbName := range databases {
+			if err := reaper.ValidateDBName(dbName); err != nil {
+				fmt.Fprintf(os.Stderr, "skip invalid db: %s\n", dbName)
+				continue
+			}
+
+			db, err := reaper.OpenDB(reaperHost, reaperPort, dbName, 10*time.Second, 10*time.Second)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "%s: connect error: %v\n", dbName, err)
+				continue
+			}
+
+			if ok, err := reaper.HasReaperSchema(db); err != nil {
+				fmt.Fprintf(os.Stderr, "%s: schema check error: %v\n", dbName, err)
+				db.Close()
+				continue
+			} else if !ok {
+				db.Close()
+				continue
+			}
+
+			result, err := reaper.AutoClose(db, dbName, staleAge, reaperDryRun)
+			db.Close()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "%s: auto-close error: %v\n", dbName, err)
+				continue
+			}
+			results = append(results, result)
 		}
 
 		if reaperJSON {
-			fmt.Println(reaper.FormatJSON(result))
+			fmt.Println(reaper.FormatJSON(results))
 		} else {
-			prefix := ""
-			if result.DryRun {
-				prefix = "[DRY RUN] would "
+			var totalClosed int
+			for _, r := range results {
+				prefix := ""
+				if r.DryRun {
+					prefix = "[DRY RUN] would "
+				}
+				for _, entry := range r.ClosedEntries {
+					fmt.Printf("  %s %s (%dd stale, db:%s)\n",
+						entry.ID, entry.Title, entry.AgeDays, entry.Database)
+				}
+				fmt.Printf("%s: %sauto-closed %d stale issues\n",
+					r.Database, prefix, r.Closed)
+				totalClosed += r.Closed
 			}
-			for _, entry := range result.ClosedEntries {
-				fmt.Printf("  %s %s (%dd stale, db:%s)\n",
-					entry.ID, entry.Title, entry.AgeDays, entry.Database)
+			if len(results) > 1 {
+				prefix := ""
+				if reaperDryRun {
+					prefix = "[DRY RUN] "
+				}
+				fmt.Printf("\n%sAuto-close summary (%d databases): auto-closed %d stale issues\n",
+					prefix, len(results), totalClosed)
 			}
-			fmt.Printf("%s: %sauto-closed %d stale issues\n",
-				result.Database, prefix, result.Closed)
 		}
 		return nil
 	},
